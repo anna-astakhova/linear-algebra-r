@@ -24,14 +24,14 @@ dot_product <- function (u,v) {
 
 mat_mul <- function (A,B){
   if (ncol(A) != nrow(B)) stop ("Inner dimensions must match: ncol(A) must equal nrow(B)")
-    m = nrows (A)
+    m = nrow (A)
     n = ncol (B)
     o = ncol (A)
-    result <- matrix (0, nrows = m, ncols = p)
+    result <- matrix (0, nrow = m, ncol = n)
     for (i in 1:m) {
       for (j in 1:n) {
         for (k in 1:o) {
-          result [i, j] <- (m[i,k] * n [k,j]) + result[i,j]
+          result [i, j] <- (A[i,k] * B[k,j]) + result[i,j]
         }
       }
     }
