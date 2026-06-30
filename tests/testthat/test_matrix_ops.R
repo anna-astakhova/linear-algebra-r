@@ -1,5 +1,5 @@
 #' Tests for matrix_ops.R
-#' Run with: source("R/matrix_ops.R"); testthat::test_file("tests/testthat/test_matrix_ops.R")
+#' Run with: ((source("R/matrix_ops.R"))); testthat::test_file("tests/testthat/test_matrix_ops.R")
 
 
 
@@ -60,3 +60,48 @@ test_that('vec_norm matches base R norm()', {
   expect_equal(vec_norm(v), norm(matrix(v), 'F'))
 })
 
+#--- det_2x2 ---------------------------------
+
+test_that('det_2x2 returns correct determinant', {
+  expect_equal(det_2x2(matrix(c(3,4,8,6), nrow = 2)), -14)
+  expect_equal(det_2x2(matrix(c(2,1,4,2), nrow=2)),  0)  # singular
+  expect_equal(det_2x2(diag(2)), 1)                       # identity → det 1
+})
+
+test_that('det_2x2 matches base R det()', {
+  A <- matrix(c(5, 2, 7, 3), nrow = 2)
+  expect_equal(det_2x2(A), det(A))
+})
+
+#--- det_3x3 ----------------------------------
+
+test_that('det_3x3 matches base R det()', {
+  A <- matrix(c(1,4,7,2,5,8,3,6,10), nrow = 3)
+  expect_equal(det_3x3(A), det(A), tolerance = 1e-10)
+})
+
+test_that('det_3x3 returns 0 for singular matrix', {
+  A <- matrix(1:9, nrow = 3, byrow = TRUE)  # rows are linearly dependent
+  expect_equal(det_3x3(A), 0, tolerance = 1e-10)
+})
+
+test_that('det_3x3 returns 1 for identity matrix', {
+  expect_equal(det_3x3(diag(3)), 1)
+})
+
+#--- inv_2x2 ---------------------------------
+
+test_that ('inv_2x2 gives A %*% A_inv = I', {
+  A <- matrix(c(3, 4, 8, 6), nrow = 2)
+  expect
+})
+
+test_that('inv_2x2 mathces base R solve()', {
+  A <- matrix(c(4, 3, 3, 2), nrow = 2)
+  expect_equal(inv_2x2(A), solve(A), tolerance = 1e-10)
+})
+
+test_that('inv_2x2 errors on singular matrix', {
+  A <- matrix(c(2, 1, 4, 2), nrow = 2)
+  expect_error(inv_2x2(A))
+})
