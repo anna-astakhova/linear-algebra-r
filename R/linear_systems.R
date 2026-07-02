@@ -31,6 +31,10 @@ row_reduce <- function(Ab) {
       Ab[row, ] <- Ab[row, ] - multiplier * Ab[col, ]
     }
   }
+  # --- FINAL GUARD: check the very last diagonal element
+  if (abs(Ab[n, n]) < 1e-10) {
+    stop("Matrix is singular or nearly singular: system may have no unique solution")
+  }
   Ab
 }
 
