@@ -1,0 +1,145 @@
+---
+title: "02: Solving Linear Systems with Gaussian Elimination"
+author: "Anna Astakhova"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("../R/matrix_ops.R")
+source("../R/linear_systems.R")
+```
+
+# The Geometry of $Ax=b$
+
+Algebraically, the linear system $Ax=b$ asks us to find an unknown vector $x$ that, when multiplied by a known matrix $A$, produces the known vector $b$. Geometrically, matrix $A$ represents a linear transformation mapping vectors from a domain space to a codomain. Therefore, the system poses a fundamental inverse question: Which specific coordinate vector $x$ in the original space lands exactly on the target coordinate $b$ after the transformation is applied?
+
+Depending on the mathematical properties of $A$, three distinct geometric cases arise:
+
+1. **Unique Solution** ($det(A)\neq0$): The matrix $A$ represents a bijective transformation. The dimensional integrity of the space is preserved (e.g., 3D space remains 3D space). Because no structural information is lost, exactly one unique vector $x$ maps to $b$.
+
+2. **No Solution** ($det(A)=0$): The transformation is singular, collapsing the space into a lower dimension, such as flattening a 3D volume onto a 2D plane (its column space). If the target vector $b$ lies outside of this lower-dimensional subspace, no possible input $x$ can reach it.
+
+3. **Infinite Solutions** ($det(A)=0$): The space is collapsed, but the target vector b happens to lie perfectly *within* the resulting subspace. Because an entire line or plane of original vectors was compressed onto that single coordinate $b$, there are infinitely many valid vectors $x$ that satisfy the equation.
+
+# The Augmented Matrix
+
+We attach $b$ to $A$ as a final column, forming the augmented matrix $[A∣b]$. This notation allows us to apply the necessary algebraic row operations to both sides of the linear equations simultaneously.
+
+$$[A|b] = \left[ \begin{array}{ccc|c}
+2 & 1 & -1 & 8 \\
+-3 & -1 & 2 & -11 \\
+-2 & 1 & 2 & -3 
+\end{array}
+\right]
+$$
+
+# Three Legal Row Operations
+
+Each operation **preserves the solution space** — it changes the algebraic form of the system, but does not alter the values of $x$ that satisfy it:
+
+1. **Swap** two rows — strictly reorders the equations, which does not affect the system's logic.
+
+2. **Scale** a row by a non-zero constant — algebraically equivalent to multiplying both sides of an equation by the same scalar.
+
+3. **Row replacement** — subtract a scalar multiple of one row from another. The theoretical multiplier is always defined as: *entry to eliminate / current pivot*.
+
+# Tracing the Algorithm
+
+To understand the computational mechanics, we trace the elimination and back-substitution phases for the $3×3$ system introduced above.
+
+## Phase 1: Forward Elimination
+
+Our objective is to reduce the augmented matrix to upper triangular form ($U$).
+
+**Step 1**: Eliminate the first variable ($x_1$) from Rows 2 and 3 using the Row 1 pivot ($2$).
+
+- $R_2 \leftarrow R_2 - (\frac{-3}{2})R_1 = R_2 + 1.5R_1$
+- $R_3 \leftarrow R_3 - (\frac{-2}{2})R_1 = R_3 + R_1$
+
+$$\left[ \begin{array}{ccc|c}
+2 & 1 & -1 & 8 \\
+0 & 0.5 & 0.5 & 1 \\
+0 & 2 & 1 & 5 
+\end{array}
+\right]
+$$
+
+**Step 2**: Eliminate the second variable ($x_2$) from Row 3 using the Row 2 pivot (0.5).
+
+-$R_3 \leftarrow R_3 - (\frac{2}{0.5})R_2 = R_3 - 4R_2$
+
+$$\left[ \begin{array}{ccc|c}
+2 & 1 & -1 & 8 \\
+0 & 0.5 & 0.5 & 1 \\
+0 & 0 & -1 & 1 
+\end{array}
+\right]
+$$
+
+## Phase 2: Back Substitution
+
+With the system now in upper triangular form, we solve sequentially from the bottom row up:
+
+- **Row 3**:$-1x_3=1\implies x_3 = -1$
+- **Row 2**:$0.5x_2 + 0.5(-1)=1 \implies 0.5x_2 = 1.5 \implies x_2=3$
+- **Row 1**:$2x_1 +(3) - (-1)=8\implies 2x_1 +4 = 8 \implies x_1 = 2$
+
+The analytical solution vector is $x = \begin{bmatrix}2\\3\\-1\end{bmatrix}$ 
+
+We now validate our scratch implementation against this manual trace:
+
+```{r}
+A_trace <- matrix(c(2, 1, -1, 
+                   -3, -1, 2, 
+                   -2, 1, 2), nrow = 3, byrow = TRUE)
+b_trace <- c(8, -11, -3)
+
+# Solve using our custom function
+x_sol <- solve_gauss(A_trace, b_trace)
+x_sol
+```
+# Why Partial Pivoting Matters
+
+Consider the following system where the initial pivot entry is exactly zero:
+
+```{r}
+A_pivot <- matrix(c(0, 2, 3, 1), nrow = 2, byrow = TRUE)
+b_pivot <- c(4, 9)
+
+# solve_gauss handles this via partial pivoting
+x_pivot <- solve_gauss(A_pivot, b_pivot)
+x_pivot
+```
+Without partial pivoting, `row_reduce()` would attempt to divide by zero at the first step, causing a catastrophic failure. Partial pivoting structurally prevents this by searching the current column for the largest absolute value and swapping that row into the pivot position before elimination. This algorithmic addition makes the solver mathematically robust and minimizes floating-point rounding errors.
+
+# Residual Check and Validation
+
+While comparing our custom `solve_gauss()` output against R's built-in `solve()` function is a useful sanity check, it is not the most mathematically rigorous way to validate computational linear algebra. The definitive test of a solver is calculating the **residual vector**: $r=b−Ax$.
+
+If the calculated coordinate vector $x$ is correct, projecting it through the original transformation matrix $A$ must exactly recover the target vector $b$ (subject to minimal floating-point precision limits).
+
+```{r}
+
+# Reconstruct b using our custom mat_mul() from Vignette 01
+# Note: we convert x_sol to a column matrix for matrix multiplication
+b_reconstructed <- mat_mul(A_trace, matrix(x_sol, ncol = 1))
+
+# Calculate the residual 
+residual <- b_trace - as.vector(b_reconstructed)
+residual
+
+# Maximum absolute error
+max(abs(residual))
+
+```
+This is how numerical software is validated in practice — by rigorously verifying that the derived result satisfies the original governing equation, rather than simply comparing outputs between different software implementations.
+
+# Moving Forward
+
+Gaussian elimination solves $Ax=b$ for a known $b$. In the next vignettes, we ask a deeper structural question: are there special vectors $x$ where multiplying by $A$ simply scales the vector without changing its fundamental direction ($Ax=λx$)? These are the eigenvectors, and they form the theoretical foundation of Principal Component Analysis (PCA), Singular Value Decomposition (SVD), and most of the advanced dimensionality reduction techniques utilized in modern data science.
