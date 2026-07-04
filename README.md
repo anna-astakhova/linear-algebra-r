@@ -48,13 +48,6 @@ The math behind the code is documented in step-by-step vignettes:
 
 To verify the algorithms locally:
 
-```{r}
-## Running the Tests
-
-This project uses a lightweight testing approach. You do not need heavy package-development tools like `devtools` or `Rtools` to verify the code. 
-
-You can run the test files individually using the `testthat` package:
-
 ```r
 # 1. Install the testing framework
 install.packages("testthat")
