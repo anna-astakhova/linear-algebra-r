@@ -20,13 +20,13 @@ I built a custom R package structure with two core mathematical engines, complet
 
 Building these algorithms exposed the practical challenges of translating exact mathematical definitions into numerically stable implementations.
 
-- **Precision**: `mat_mul()` matches R's `%*%` operator to 10 decimal places across 2×2, 3×3, and non-square matrices.
+- `mat_mul()` matches R's `%*%` operator to 10 decimal places across 2×2, 3×3, and non-square matrices.
   
-- **Accuracy**: `solve_gauss()` recovers exact solution vectors (e.g., x = (2, 3, −1)) from 3×3 systems with residual ‖Ax − b‖ < 1e-10.
+- `solve_gauss()` recovers exact solution vectors (e.g., x = (2, 3, −1)) from 3×3 systems with residual ‖Ax − b‖ < 1e-10.
   
-- **Stability**: The solver detects singular and near-singular matrices before elimination begins, throwing an informative error rather than returning numerically corrupted results.
+- The solver detects singular and near-singular matrices before elimination begins, throwing an informative error rather than returning numerically corrupted results.
 
-- **Reliability**: Validated by a testthat suite of 26 unit tests covering edge cases including zero pivots, mismatched dimensions, singular systems, and identity matrix behaviour — all passing.
+- Validated by a testthat suite of 26 unit tests covering edge cases including zero pivots, mismatched dimensions, singular systems, and identity matrix behaviour — all passing.
   
 ## Repository Structure
 
