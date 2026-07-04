@@ -1,5 +1,9 @@
 #' Compute the dot product of two vectors
 #'
+#' Mathematically calculates the scalar product of two vectors u and v.
+#' It computes the sum of the products of their corresponding entries:
+#' u . v = sum_{i=1}^n (u_i * v_i)
+#'
 #' @param u Numeric vector
 #' @param v Numeric vector of the same length as u
 #' @return A single number: the sum of element-wise products
@@ -7,37 +11,45 @@ dot_product <- function (u,v) {
   if (length(u) != length(v)) stop ('Vectors must be the same length')
   total <- 0
   for (i in seq_along(u)) {
-  total <- total + u[i] * v[i]
+    total <- total + u[i] * v[i]
   }
   total
 }
 
-
-
 #' Multiply two matrices from scratch
+#'
+#' Mathematically computes the matrix product C = AB.
+#' If A is an (m x o) matrix and B is an (o x n) matrix, the resulting
+#' matrix C has dimensions (m x n). Each element C_ij is the dot product
+#' of the i-th row of A and the j-th column of B:
+#' C_ij = sum_{k=1}^o (A_ik * B_kj)
 #'
 #' @param A Numeric matrix (m x n)
 #' @param B Numeric matrix (n x p)
 #' @return Numeric matrix (m x p)
 mat_mul <- function (A,B){
   if (ncol(A) != nrow(B)) stop ("Inner dimensions must match: ncol(A) must equal nrow(B)")
-    m = nrow (A)
-    n = ncol (B)
-    o = ncol (A)
-    result <- matrix (0, nrow = m, ncol = n)
-    for (i in 1:m) {
-      for (j in 1:n) {
-        for (k in 1:o) {
-          result [i, j] <- (A[i,k] * B[k,j]) + result[i,j]
-        }
+  m = nrow (A)
+  n = ncol (B)
+  o = ncol (A)
+  result <- matrix (0, nrow = m, ncol = n)
+  for (i in 1:m) {
+    for (j in 1:n) {
+      for (k in 1:o) {
+        result [i, j] <- (A[i,k] * B[k,j]) + result[i,j]
       }
     }
-result
+  }
+  result
 }
 
-
-
 #' Transpose a matrix from scratch
+#'
+#' Mathematically reflects a matrix over its main diagonal.
+#' For an original matrix A of dimensions (m x n), the transpose A^T
+#' has dimensions (n x m) where the element at the i-th row and j-th
+#' column of A^T equals the element at the j-th row and i-th column of A:
+#' (A^T)_ij = A_ji
 #'
 #' @param A Numeric matrix (m x n)
 #' @return Numeric matrix (n x m)
@@ -53,10 +65,13 @@ mat_transpose <- function(A) {
   result
 }
 
-
 #' Compute the L2 (Euclidean) norm of a vector
 #'
-#' @param v Numeric vector
+#' Mathematically calculates the geometric length (magnitude) of a vector v.
+#' It uses the Pythagorean theorem extended to n dimensions:
+#' ||v||_2 = sqrt(sum_{i=1}^n (v_i^2))
+#'
+#' @param V Numeric vector
 #' @return A single positive number: the length of the vector
 vec_norm <- function (V) {
   n <- length (V)
@@ -67,11 +82,12 @@ vec_norm <- function (V) {
   sqrt(sum_squares)
 }
 
-
 #' Determinant of a 2x2 matrix
 #'
-#' Uses the formula: det = ad - bc
-#' Geometrically: the factor by which the transformation scales area
+#' Mathematically computes the determinant for a 2x2 matrix A = [[a, b], [c, d]].
+#' det(A) = (a * d) - (b * c).
+#' Geometrically, this represents the oriented area scaling factor of the
+#' linear transformation described by the matrix.
 #'
 #' @param A A 2x2 numeric matrix
 #' @return A single number: the determinant
@@ -80,12 +96,14 @@ det_2x2 <- function(A) {
   A[1,1]*A[2,2] - A[1,2]*A[2,1]
 }
 
-
 #' Determinant of a 3x3 matrix via cofactor expansion
 #'
-#' Expands along the first column: det = a*M11 - b*M21 + c*M31
-#' where Mij is the determinant of the 2x2 submatrix
-#' formed by deleting row i and column j
+#' Mathematically computes the determinant using Laplace expansion down the
+#' first column. For a 3x3 matrix, it breaks the calculation into three 2x2
+#' determinants (minors) multiplied by alternating signs:
+#' det(A) = A_11*(A_22*A_33 - A_23*A_32)
+#'        - A_21*(A_12*A_33 - A_13*A_32)
+#'        + A_31*(A_12*A_23 - A_13*A_22)
 #'
 #' @param A A 3x3 numeric matrix
 #' @return A single number: the determinant
@@ -97,8 +115,11 @@ det_3x3 <- function(A) {
 
 #' Inverse of a 2x2 matrix
 #'
-#' Uses the closed-form formula:
-#' A_inv = (1/det(A)) * [[d, -b], [-c, a]]
+#' Mathematically calculates the matrix A^(-1) such that A * A^(-1) = I.
+#' For a 2x2 matrix [[a, b], [c, d]], it uses the closed-form formula:
+#' A^(-1) = (1 / det(A)) * [[d, -b],
+#'                          [-c, a]]
+#' If the determinant is 0, the matrix is singular and cannot be inverted.
 #'
 #' @param A A 2x2 numeric matrix
 #' @return The 2x2 inverse matrix
@@ -111,8 +132,11 @@ inv_2x2 <- function(A) {
 
 #' Check that A_inv is the true inverse of A
 #'
-#' Multiplies A by A_inv using mat_mul() and checks
-#' the result is close to the identity matrix
+#' Mathematically verifies the identity A * A^(-1) = I.
+#' It multiplies the original matrix A by the proposed inverse A_inv and
+#' checks if the resulting (n x n) matrix equals the Identity matrix I
+#' (1s on the diagonal, 0s elsewhere) within a small numerical tolerance
+#' to account for floating-point arithmetic errors.
 #'
 #' @param A Original matrix
 #' @param A_inv Proposed inverse
