@@ -49,11 +49,23 @@ The math behind the code is documented in step-by-step vignettes:
 To verify the algorithms locally:
 
 ```{r}
-# install dependencies
-install.packages(c("devtools", "testthat"))
+## Running the Tests
 
-# run the full test suite
-devtools::test()
+This project uses a lightweight testing approach. You do not need heavy package-development tools like `devtools` or `Rtools` to verify the code. 
+
+You can run the test files individually using the `testthat` package:
+
+```r
+# 1. Install the testing framework
+install.packages("testthat")
+
+# 2. Load the core functions into your environment
+source("R/matrix_ops.R")
+source("R/linear_systems.R")
+
+# 3. Run the specific test files
+testthat::test_file("tests/testthat/test_matrix_ops.R")
+testthat::test_file("tests/testthat/test_linear_systems.R")
 ```
 
 
