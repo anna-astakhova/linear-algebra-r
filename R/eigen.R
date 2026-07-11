@@ -46,7 +46,7 @@ power_iteration <- function(A, n_iter = 1000, tol = 1e-10) {
 #' @param v Numeric vector: the known dominant eigenvector.
 #' @return Deflated matrix of the same dimensions as A.
 #' @export
-deflate <- function(A, v, eigenvalue) {
+deflate <- function(A, eigenvalue, v) {
   # Calculate the outer product and subtract the weighted footprint
   A - eigenvalue * (v%*%t(v))
 }
