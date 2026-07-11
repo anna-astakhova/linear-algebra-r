@@ -1,5 +1,5 @@
 #' Tests for matrix_ops.R
-#' Run with: ((source("R/matrix_ops.R"))); testthat::test_file("tests/testthat/test_matrix_ops.R")
+#' Run with: source("R/matrix_ops.R"); testthat::test_file("tests/testthat/test_matrix_ops.R")
 
 
 

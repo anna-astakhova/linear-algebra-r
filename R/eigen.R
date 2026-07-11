@@ -80,7 +80,7 @@ eigen_decomp <- function(A, k = nrow(A)) {
     eigenvectors[, i] <- result$vector
 
     # Mathematically remove this current from the working matrix
-    A_current <- deflate(A_current, result$value, result$vector)
+    A_current <- deflate(A = A_current, eigenvalue = result$value, v = result$vector)
   }
 
   list(values = eigenvalues, vectors = eigenvectors)

@@ -1,5 +1,5 @@
 #' Tests for linear_systems.R
-#' Run with: ((source("R/linear_systems.R"))); testthat::test_file("tests/testthat/test_linear_systems.R")
+#' Run with: source("R/linear_systems.R"); testthat::test_file("tests/testthat/test_linear_systems.R")
 
 # ── row_reduce ───────────────────────────────────────────
 
