@@ -1,0 +1,148 @@
+---
+title: "04: Singular Value Decomposition and its Relationship to PCA"
+author: "Anna Astakhova"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+source("../R/matrix_ops.R")
+source("../R/eigen.R")
+source("../R/pca.R")
+source("../R/svd_compress.R")
+```
+
+## The Geometric Why: Moving Beyond Square Matrices
+
+n our previous vignette, we built PCA by relying on a fundamental prerequisite: our data matrix $X$ X had to be transformed into a square covariance matrix $C = X^\top X$ before we could eigendecompose it. While this approach works perfectly well conceptually, it begs a structural question: is there a more direct mathematical path that lets us decompose the raw, rectangular matrix $X$ itself, without forming $C$ first?
+
+The answer is **Singular Value Decomposition (SVD)**. You can think of SVD as the ultimate generalization of eigendecomposition. It works on rectangular matrices of any conceivable shape. It is arguably the most general matrix factorization in all of linear algebra. SVD is the hidden engine powering image compression, natural language processing, recommender systems, and PCA itself.
+
+By unpacking SVD, we will discover that our eigenvalue approach from Vignette 03 and the SVD approach are just two different paths up the same mathematical mountain.
+
+---
+
+## The SVD factorisation: $A = U \Sigma V^\top$
+
+For any matrix $A$ of dimension $m \times n$, SVD produces three matrices:
+
+$$A = U \Sigma V^\top$$
+
+where:
+
+- $U$ is $m \times m$ with orthonormal columns — the **left singular vectors**, which are the eigenvectors of $AA^\top$
+- $\Sigma$ is $m \times n$ with non-negative values $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r \geq 0$ on the diagonal and zeros elsewhere — the **singular values**
+- $V$ is $n \times n$ with orthonormal columns — the **right singular vectors**, which are the eigenvectors of $A^\top A$
+
+The singular values $\sigma_i$ are always real and non-negative, regardless of the entries of $A$. They are related to eigenvalues by:
+
+$$\sigma_i = \sqrt{\lambda_i(A^\top A)}$$
+
+where $\lambda_i(A^\top A)$ denotes the $i$-th eigenvalue of $A^\top A$.
+
+### Geometric interpretation
+
+SVD says that any linear transformation $A$ can be decomposed into three stages:
+
+1. **$V^\top$**: rotate the input into a coordinate system aligned with the "input principal directions"
+2. **$\Sigma$**: scale each axis by the corresponding singular value (and possibly change dimension)
+3. **$U$**: rotate into the output coordinate system
+
+Every matrix is simply a composition of two rotations and a scaling. The singular values are just the mathematical instructions telling us exactly how much to stretch each structural direction.
+
+---
+
+## Deriving SVD from Eigendecomposition
+
+We do not need a new algorithm. SVD follows directly from the eigendecomposition tools built in vignette 02.
+
+**Step 1**: Form $A^\top A$. This is always symmetric and positive semi-definite matrix, so its eigenvalues are real and non-negative (spectral theorem).
+
+**Step 2**: Eigendecompose $A^\top A = V D V^\top$. The columns of $V$ are the right singular vectors; the eigenvalues $\lambda_i$ give singular values $\sigma_i = \sqrt{\lambda_i}$.
+
+**Step 3**: Recover the left singular vectors column by column:
+
+$$\mathbf{u}_i = \frac{A \mathbf{v}_i}{\sigma_i}$$
+
+This works because $A \mathbf{v}_i = \sigma_i \mathbf{u}_i$ by the definition of SVD, which rearranges directly to the formula above.
+
+**Step 4**: Verify: $U \Sigma V^\top$ should recover $A$ to numerical precision.
+
+---
+
+## Implementation
+
+```{r compute-svd-demo}
+# Demonstrate SVD on a small matrix
+A <- matrix(c(3, 2, 1, 2, 4, 1), nrow = 3)
+
+my_svd  <- compute_svd(A)
+ref_svd <- svd(A)
+
+cat("=== Singular value comparison ===\n")
+cat("Ours:   ", round(my_svd$Sigma, 6), "\n")
+cat("svd()$d:", round(ref_svd$d,    6), "\n\n")
+
+# Verify reconstruction: U Sigma V^T should recover A
+Sigma_mat <- diag(my_svd$Sigma, 
+                  nrow = length(my_svd$Sigma), 
+                  ncol = length(my_svd$Sigma))
+
+A_reconstructed <- my_svd$U %*% Sigma_mat %*% t(my_svd$V)
+cat("Max reconstruction error:", max(abs(A - A_reconstructed)), "\n")
+```
+
+Reassuringly, our scratch implementation's singular values perfectly match R's highly optimized `svd()` function, and our reconstruction error is practically zero.
+
+---
+
+## The Connection between SVD and PCA
+
+If we take the SVD of our mean-centred data ($X_c = U \Sigma V^\top$)and plug it directly into our PCA covariance formula, the terms simplify to reveal a direct, perfect mapping between the two methods:
+
+- **The right singular vectors V** from SVD are exactly the **eigenvectors** of our covariance matrix (our principal component directions).
+
+- The **singular values $\sigma_i$** from SVD perfectly relate to our PCA eigenvalues via a simple scaling factor: $\sigma_i^2 / (n-1) = \lambda_i$
+
+- The **PC scores** can be calculated using $X_c V = U \Sigma$
+
+We can prove this computationally:
+
+```{r svd-pca-equivalence}
+X <- as.matrix(iris[, 1:4])
+X_c <- centre_data(X)
+
+# PCA via covariance eigendecomposition (vignette 03 approach)
+pca_eig <- compute_pca(X, k = 2)
+
+# PCA via SVD of centred data matrix directly
+svd_result <- svd(X_c)
+n <- nrow(X_c)
+
+# Singular values squared / (n-1) should equal PCA eigenvalues
+svd_eigenvalues <- svd_result$d^2 / (n - 1)
+
+cat("PCA eigenvalues (covariance approach):", round(pca_eig$eigenvalues, 6), "\n")
+cat("SVD-derived eigenvalues:              ", round(svd_eigenvalues[1:2], 6), "\n\n")
+
+# Right singular vectors V should equal PCA loadings
+# (up to sign)
+cat("PCA loadings PC1 (covariance):  ", round(pca_eig$loadings[, 1], 4), "\n")
+cat("SVD right singular vector V1:   ", round(svd_result$v[, 1], 4),    "\n")
+```
+
+The outputs are mathematically identical.
+
+---
+
+## Summary
+
+We just explored how Singular Value Decomposition (SVD) offers a direct, mathematically robust way to compress raw data without ever calculating a covariance matrix. We proved computationally that SVD and PCA are functionally the exact same operation.
+
+In the next vignette, we will take this exact same mathematical pipeline and point it at neural population data. The underlying algebra remains completely unchanged; only our human interpretation of the geometry will shift.

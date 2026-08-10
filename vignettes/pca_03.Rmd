@@ -78,10 +78,6 @@ $$C = PDP^\top$$
 
 By rotating our coordinate system to align with these eigenvectors, the covariance matrix becomes perfectly diagonal. This mathematically guarantees that our new principal components are completely **uncorrelated by construction**.
 
-We can verify this: if we project the data onto the principal components to get scores $Z = X_c P$, the covariance matrix of $Z$ should be diagonal:
-
-$$\text{Cov}(Z) = \frac{1}{n-1} Z^\top Z = \frac{1}{n-1} P^\top X_c^\top X_c P = P^\top C P = D$$
-
 ---
 
 ## Implementation
@@ -245,4 +241,4 @@ The key insight is that PC1 and PC2 were not chosen by a biologist — they emer
 
 In this vignette, we successfully derived PCA from first principles, proved its equivalence to covariance diagonalisation, and rigorously validated our custom implementation against built-in software. We also saw how abstract eigenvectors can neatly unpack biological reality.
 
-In the next vignette, we will take this exact same mathematical pipeline and point it at neural population data. The underlying algebra remains completely unchanged; only our human interpretation of the geometry will shift.
+In the next vignette, we will explore Singular Value Decomposition (SVD) - a more direct and numerically stable way to achieve these exact same geometric results without ever having to calculate a square covariance matrix.
