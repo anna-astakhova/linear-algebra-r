@@ -1,0 +1,248 @@
+---
+title: "03: Principal Component Analysis from First Principles"
+author: "Anna Astakhova"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+source("../R/matrix_ops.R")
+source("../R/eigen.R")
+source("../R/pca.R")
+source("../R/linear_systems.R")
+
+```
+
+## The Geometry of High-Dimensional Space
+
+When we collect a dataset with p variables, we are essentially plotting points in a p-dimensional space. But as p grows large, a geometric problem arises: visualization becomes impossible, and we realize that most of that vast space is actually completely empty. The original variables often carry redundant, overlapping information.  
+
+**Principal Component Analysis (PCA)** tackles this by finding a lower-dimensional subspace that preserves as much of the data's original variation as structurally possible. Rather than simply throwing away existing variables, PCA thoughtfully constructs entirely new ones—linear combinations of the originals, ordered perfectly by how much variance they explain.  
+
+Because of this elegant geometric property, PCA is a ubiquitous tool across data science:
+
+- In genomics, it compresses thousands of gene expression measurements into meaningful axes. 
+
+- In neuroscience, it reveals the dominant modes of - population activity in the brain.  
+
+- In climate science, it uncovers spatial patterns in complex temperature fields.  
+
+- In machine learning, it serves as a foundational pre-processing step to reduce noise before supervised learning.  
+
+- In every single one of these fields, the underlying mathematics is exactly identical—which is why building it from scratch and understanding it from first principles is so deeply rewarding.
+
+---
+
+## Mathematical Foundations
+
+### Maximizing Variance
+
+Given an $n \times p$ data matrix $X$ (where $n$ is the number of observations and $p$ is the number of variables), PCA asks: what unit vector $\mathbf{w} \in \mathbb{R}^p$ maximises the variance of the projected data $X\mathbf{w}$?
+
+Algebraically, the variance of this projection is expressed as:
+
+$$\text{Var}(X\mathbf{w}) = \mathbf{w}^\top C \mathbf{w}$$
+
+where $C = \frac{1}{n-1} X_c^\top X_c$ is the **sample covariance matrix** and $X_c$ is our mean-centred data. We want to maximise this subject to
+the constraint $\|\mathbf{w}\| = 1$, so that the direction vector is well-defined.
+
+### Deriving the Solution via Lagrange Multipliers
+
+To solve this, we maximise $\mathbf{w}^\top C \mathbf{w}$ subject to $\mathbf{w}^\top \mathbf{w} = 1$ using Lagrangian multipliers:
+
+$$\mathcal{L}(\mathbf{w}, \lambda) = \mathbf{w}^\top C \mathbf{w} - \lambda (\mathbf{w}^\top \mathbf{w} - 1)$$
+
+Taking the derivative with respect to $\mathbf{w}$ and setting it to zero:
+
+$$\frac{\partial \mathcal{L}}{\partial \mathbf{w}} = 2C\mathbf{w} - 2\lambda \mathbf{w} = 0$$
+
+$$C\mathbf{w} = \lambda \mathbf{w}$$
+
+This is the standard eigenvalue equation. The direction $\mathbf{w}$ that maximises variance is an **eigenvector of the covariance matrix**, and the maximum variance achieved equals the corresponding **eigenvalue** $\lambda$:
+
+$$\mathbf{w}^\top C \mathbf{w} = \mathbf{w}^\top (\lambda \mathbf{w}) = \lambda \|\mathbf{w}\|^2 = \lambda$$
+
+The first principal component is the eigenvector with the **largest** eigenvalue. The second principal component is the eigenvector with the second-largest eigenvalue, and so on. Because the covariance matrix is symmetric, these eigenvectors are guaranteed to be orthogonal — the spectral theorem we verified in vignette 02.
+
+### PCA as Diagonalisation
+
+Geometrically, this process is equivalent to diagonalizing the covariance matrix. Let $P$ be the matrix whose columns are the eigenvectors of $C$, and $D$ be the diagonal matrix of eigenvalues. Then:
+
+$$C = PDP^\top$$
+
+By rotating our coordinate system to align with these eigenvectors, the covariance matrix becomes perfectly diagonal. This mathematically guarantees that our new principal components are completely **uncorrelated by construction**.
+
+We can verify this: if we project the data onto the principal components to get scores $Z = X_c P$, the covariance matrix of $Z$ should be diagonal:
+
+$$\text{Cov}(Z) = \frac{1}{n-1} Z^\top Z = \frac{1}{n-1} P^\top X_c^\top X_c P = P^\top C P = D$$
+
+---
+
+## Implementation
+
+Let's test our homegrown linear algebra functions. We will apply a five-step pipeline built entirely from scratch in previous vignettes, intentionally avoiding any built-in PCA functions.
+
+First, we calculate the covariance matrix of our centered data and compare it to R's built-in cov() function:
+
+```{r pca-pipeline-demo}
+# Step 1: centre the data
+X <- as.matrix(iris[, 1:4])
+X_c <- centre_data(X)
+
+# Step 2: covariance matrix — compare to R's cov() as validation
+C_ours <- covariance_matrix(X_c)
+C_ref  <- cov(X)
+cat("Max difference from cov():", max(abs(C_ours - C_ref)), "\n")
+```
+
+Next, we verify the diagonalisation ($P^\topC P$):
+
+```{r diagonalisation-check}
+# Step 3: eigendecompose C
+eig <- eigen_decomp(C_ours)
+
+# Verify diagonalisation: P^T C P should be diagonal
+P      <- eig$vectors
+D_approx <- t(P) %*% C_ours %*% P
+
+cat("P^T C P (should be diagonal — eigenvalues on diagonal, zeros elsewhere):\n")
+print(round(D_approx, 6))
+```
+
+The off-diagonal entries are zero to numerical precision, confirming that the eigenvectors of the covariance matrix diagonalise it — the principal components are uncorrelated. 
+
+```{r full-pca}
+# Steps 4 and 5: select components, project data
+pca_result <- compute_pca(X, k = 4)
+
+# Variance explained
+var_df <- data.frame(
+  PC            = paste0("PC", 1:4),
+  Eigenvalue    = round(pca_result$eigenvalues, 4),
+  Var_Explained = round(pca_result$var_explained * 100, 2),
+  Cumulative    = round(pca_result$cum_var_explained * 100, 2)
+)
+knitr::kable(var_df, col.names = c("Component", "Eigenvalue",
+             "Variance Explained (%)", "Cumulative (%)"))
+```
+
+The off-diagonal entries are zero to numerical precision, confirming our components are uncorrelated. Finally, we validate our custom compute_pca() against R's trusted prcomp():
+
+```{r validate-vs-prcomp}
+# Validate against R's prcomp()
+validate_pca(X, k = 2)
+```
+
+Our eigenvalues match `prcomp()`'s squared standard deviations to 4 decimal places, and our explained variance ratios are identical. The loadings agree in
+magnitude (sign differences are expected and valid — if $\mathbf{w}$ is an eigenvector, so is $-\mathbf{w}$).
+
+---
+
+## Results: PCA of the iris dataset
+
+To see this in action, we turn to the classic iris dataset, which measures four morphological traits (sepal length/width, petal length/width) across 150 flowers.
+
+### Scree Plot
+
+```{r scree-plot, fig.width=7, fig.height=4}
+library(ggplot2)
+
+scree_df <- data.frame(
+  PC         = 1:4,
+  Variance   = pca_result$var_explained * 100,
+  Cumulative = pca_result$cum_var_explained * 100
+)
+
+ggplot(scree_df, aes(x = PC)) +
+  geom_col(aes(y = Variance), fill = "#7F77DD", alpha = 0.85, width = 0.6) +
+  geom_line(aes(y = Cumulative), colour = "#1D9E75", linewidth = 1) +
+  geom_point(aes(y = Cumulative), colour = "#1D9E75", size = 3) +
+  geom_hline(yintercept = 95, linetype = "dashed",
+             colour = "#BA7517", alpha = 0.8) +
+  annotate("text", x = 3.5, y = 96.5, label = "95% threshold",
+           size = 3.5, colour = "#BA7517") +
+  scale_y_continuous(limits = c(0, 105)) +
+  labs(
+    title    = "Scree Plot: Variance Explained by Each Principal Component",
+    subtitle = "Bars = individual component; line = cumulative",
+    x        = "Principal Component",
+    y        = "Variance Explained (%)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+PC1 alone explains **92.46%** of total variance. PC1 and PC2 together explain **97.77%**, capturing nearly all of the structure in the four-dimensional data
+within two dimensions. PC3 and PC4 together account for only 2.23%, meaning they can be safely discarded with almost no loss of structural information.
+
+### Scores Biplot
+
+```{r biplot, fig.width=7, fig.height=5}
+scores_df <- data.frame(
+  PC1     = pca_result$scores[, 1],
+  PC2     = pca_result$scores[, 2],
+  Species = iris$Species
+)
+
+ggplot(scores_df, aes(x = PC1, y = PC2, colour = Species)) +
+  geom_point(size = 2.5, alpha = 0.85) +
+  scale_colour_manual(values = c("#7F77DD", "#1D9E75", "#BA7517")) +
+  labs(
+    title    = "PCA of Iris Dataset — PC1 vs PC2",
+    subtitle = "Implemented from scratch via eigendecomposition of the covariance matrix",
+    x        = "PC1 (92.46% variance)",
+    y        = "PC2 (5.31% variance)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+Three clusters emerge clearly in the PC1–PC2 plane. *Iris setosa* separates completely from the other two species along PC1, while *I. versicolor* and *I. virginica* show partial overlap along PC2. No class labels were used in the analysis — this structure was discovered entirely from the geometry of the covariance matrix.
+
+### Loadings Plot
+```{r loadings-plot, fig.width=8, fig.height=4}
+var_names   <- c("Sepal.Length", "Sepal.Width", "Petal.Length", "Petal.Width")
+loadings_df <- data.frame(
+  Variable  = rep(var_names, 2),
+  Loading   = c(pca_result$loadings[, 1], pca_result$loadings[, 2]),
+  Component = rep(c("PC1", "PC2"), each = 4)
+)
+
+ggplot(loadings_df, aes(x = Variable, y = Loading, fill = Component)) +
+  geom_col(position = "dodge", alpha = 0.85, width = 0.6) +
+  scale_fill_manual(values = c("#7F77DD", "#1D9E75")) +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  labs(
+    title    = "PCA Loadings: Contribution of Each Variable to PC1 and PC2",
+    subtitle = "Large absolute loading = strong contribution to that component",
+    x        = NULL, y = "Loading"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+```
+
+### Interpreting the Loadings
+
+When we project the data onto our new PC1 and PC2 axes, three distinct clusters organically emerge.
+- Iris setosa separates completely from the pack along the PC1 axis.  
+- I. versicolor and I. virginica show a partial overlap, separated primarily along PC2.
+
+When we look at the mathematical loadings (how much each original variable contributes to the new components), we can assign biological meaning to our abstract math:
+
+- **PC1** is driven heavily by petal length (0.857) and petal width (0.358). It effectively represents the "overall flower size". Because I. setosa has tiny petals, it scores very low here, causing that clean separation.  
+
+- **PC2** is driven by a contrast between sepal and petal measurements. It represents a "shape axis" (e.g., flowers with wide sepals relative to their petals), which helps tease apart the remaining two species.
+
+The key insight is that PC1 and PC2 were not chosen by a biologist — they emerged from the mathematics of eigendecomposition applied to the covariance structure of the data. 
+
+---
+
+## Moving Forward
+
+In this vignette, we successfully derived PCA from first principles, proved its equivalence to covariance diagonalisation, and rigorously validated our custom implementation against built-in software. We also saw how abstract eigenvectors can neatly unpack biological reality.
+
+In the next vignette, we will take this exact same mathematical pipeline and point it at neural population data. The underlying algebra remains completely unchanged; only our human interpretation of the geometry will shift.
