@@ -1,17 +1,28 @@
 Package: linear.algebra.r
-Title: What the Package Does (One Line, Title Case)
+Title: Linear Algebra from Scratch in R
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Anna", "Astakhova", , "fanna.astakhova.work@gmail.com", role = c("aut", "cre"))
+Description: Implements core linear algebra algorithms—including custom matrix 
+    operations, Gaussian elimination, eigendecomposition, PCA, and SVD—from 
+    first principles in R without relying on built-in matrix operators or 
+    statistical functions. Validates custom implementations against base R 
+    methods and demonstrates dimensionality reduction on functional neural 
+    characterisations from the Allen Brain Observatory.
 License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
     license
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+Depends: 
+    R (>= 4.3.0)
+Imports: 
+    ggplot2,
+    R.matlab
 Suggests: 
+    testthat (>= 3.0.0),
     knitr,
     rmarkdown,
-    testthat (>= 3.0.0)
-Config/testthat/edition: 3
-VignetteBuilder: knitr
+    devtools
+VignetteBuilder: 
+    knitr

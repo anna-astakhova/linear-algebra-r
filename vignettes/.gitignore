@@ -1,2 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+.httr-oauth
 *.html
-*.R
+Rplots.pdf
+docs/

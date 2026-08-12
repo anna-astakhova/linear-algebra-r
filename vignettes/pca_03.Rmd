@@ -21,7 +21,7 @@ source("../R/linear_systems.R")
 
 ## The Geometry of High-Dimensional Space
 
-When we collect a dataset with p variables, we are essentially plotting points in a p-dimensional space. But as p grows large, a geometric problem arises: visualization becomes impossible, and we realize that most of that vast space is actually completely empty. The original variables often carry redundant, overlapping information.  
+When we collect a dataset with p variables, we are essentially plotting points in a p-dimensional space. But as p grows large, a geometric problem arises: visualisation becomes impossible, and we realise that most of that vast space is actually completely empty. The original variables often carry redundant, overlapping information.  
 
 **Principal Component Analysis (PCA)** tackles this by finding a lower-dimensional subspace that preserves as much of the data's original variation as structurally possible. Rather than simply throwing away existing variables, PCA thoughtfully constructs entirely new ones—linear combinations of the originals, ordered perfectly by how much variance they explain.  
 
@@ -224,6 +224,7 @@ ggplot(loadings_df, aes(x = Variable, y = Loading, fill = Component)) +
 ### Interpreting the Loadings
 
 When we project the data onto our new PC1 and PC2 axes, three distinct clusters organically emerge.
+
 - Iris setosa separates completely from the pack along the PC1 axis.  
 - I. versicolor and I. virginica show a partial overlap, separated primarily along PC2.
 

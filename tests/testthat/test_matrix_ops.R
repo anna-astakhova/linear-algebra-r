@@ -1,6 +1,5 @@
 #' Tests for matrix_ops.R
-#' Run with: source("R/matrix_ops.R"); testthat::test_file("tests/testthat/test_matrix_ops.R")
-
+#' Run with: devtools::test()
 
 
 # --- dot_product ----------------------------
@@ -91,12 +90,12 @@ test_that('det_3x3 returns 1 for identity matrix', {
 
 #--- inv_2x2 ---------------------------------
 
-test_that ('inv_2x2 gives A %*% A_inv = I', {
+test_that("inv_2x2 gives A %*% A_inv = I", {
   A <- matrix(c(3, 4, 8, 6), nrow = 2)
-  expect
+  expect_equal(A %*% inv_2x2(A), diag(2))
 })
 
-test_that('inv_2x2 mathces base R solve()', {
+test_that('inv_2x2 matches base R solve()', {
   A <- matrix(c(4, 3, 3, 2), nrow = 2)
   expect_equal(inv_2x2(A), solve(A), tolerance = 1e-10)
 })

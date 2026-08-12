@@ -1,0 +1,300 @@
+---
+title: "05: PCA on Neural Population Data from the Allen Brain Observatory"
+author: "Anna Astakhova"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: kate
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = "..")
+```
+
+```{r load-scripts}
+source("R/matrix_ops.R")
+source("R/eigen.R")
+source("R/pca.R")
+source("R/neural_pca.R")
+source("R/svd_compress.R")
+library(ggplot2)
+```
+
+## Motivation
+
+Modern recording techniques have completely transformed how we look at the brain, allowing neuroscientists to simultaneously measure the functional properties of hundreds of neurons. The Allen Brain Observatory Visual Coding dataset perfectly illustrates this shift: it characterizes over 4000 neurons in the mouse visual cortex, describing each one through dozens of functional metrics like orientation selectivity, receptive field size, and running modulation.
+
+We are left with a massive, high-dimensional matrix where each row represents a single neuron, and each column represents a functional property.
+
+The fundamental question we are asking here is no longer "what does this specific neuron do?" but rather, "what is the population doing?". How are these functional properties structurally organised across the entire network, and how many independent axes of variation truly exist within the data? This is exactly the kind of structural question dimensionality reduction was built to answer.
+
+We are going to take the exact same PCA pipeline we built from scratch in Vignette 03 - centering, covariance, eigendecomposition, and projection - and apply it directly to this brain data without a single modification. The algebra remains identical; only our biological interpretation changes.
+
+---
+
+## The dataset
+
+The data we are analyzing comes from the Allen Brain Observatory Visual Coding dataset (publicly accessible at portal.brain-map.org). Our matrix consists of 316 rows (neurons recorded via two-photon calcium imaging) and 47 columns (functional properties measured while the mouse viewed standardized visual stimuli, like drifting gratings _dg or natural scenes _ns).
+
+Here are a few key properties we will be looking at:
+
+- `osi_dg`, `osi_sg` — orientation selectivity index (how sharply tuned a neuron is to a particular orientation)
+- `dsi_dg` — direction selectivity index (preference for motion direction)
+- `peak_dff_dg`, `peak_dff_sg`, `peak_dff_ns` — peak fluorescence response to each stimulus class
+- `reliability_dg`, `reliability_sg`, `reliability_ns` — trial-to-trial response consistency
+- `rf_area_on_lsn`, `rf_area_off_lsn` — receptive field area measured by locally sparse noise
+- `run_mod_dg`, `run_mod_sg` — modulation of response by locomotion
+
+```{r load-data}
+# Load data directly
+raw <- read.csv("data/cell_metrics.csv", row.names = 1)
+neural_signal <- as.matrix(raw[, sapply(raw, is.numeric)])
+
+# Impute missing values with column means
+if (any(is.na(neural_signal))) {
+  for (j in 1:ncol(neural_signal)) {
+    if (any(is.na(neural_signal[, j]))) {
+      neural_signal[is.na(neural_signal[, j]), j] <- mean(neural_signal[, j], na.rm = TRUE)
+    }
+  }
+}
+
+# remove identifier columns
+metadata_cols <- c("experiment_container_id", "specimen_id",
+                   "tld1_id", "tld2_id", "tlr1_id")
+neural_signal <- neural_signal[, !colnames(neural_signal) %in% metadata_cols]
+
+# remove zero-variance columns
+col_vars      <- apply(neural_signal, 2, var, na.rm = TRUE)
+neural_signal <- neural_signal[, col_vars > 0]
+
+# remove rows with missing values
+neural_signal <- neural_signal[complete.cases(neural_signal), ]
+
+cat(sprintf("Final matrix: %d neurons x %d functional properties\n",
+            nrow(neural_signal), ncol(neural_signal)))
+```
+
+---
+
+## Data Preparation: Why Scaling is Required Here
+
+In Vignette 03, we ran PCA on the iris dataset without scaling the data first. That worked perfectly fine because all four flower measurements shared the exact same units (centimeters) and had comparable numerical ranges. The Allen Brain data violates these conditions. For instance, a neuron's preferred direction (pref_dir_dg) is measured in degrees (ranging from 0 to 360, with a massive variance of ~4554). Meanwhile, its preferred spatial frequency (pref_sf_sg) is measured in cycles per degree (ranging from 0 to 0.32, with a tiny variance of ~0.005).
+
+Without scaling, PCA would be dominated entirely by columns with large numerical ranges — not because they are biologically more important, but because their units are larger.
+
+To fix this, we scale every single column to have a mean of zero and a unit variance of one before we ever touch the covariance matrix. Geometrically, this treats every functional property as equally important a priori, forcing the algorithm to find structural variance based on relationships rather than raw scale.
+
+```{r scale-data}
+neural_scaled <- scale(neural_signal)
+
+# confirm: each column now has mean 0 and variance 1
+col_means <- round(colMeans(neural_scaled), 10)
+col_sds   <- round(apply(neural_scaled, 2, sd), 10)
+cat("Column means (should all be 0):", range(col_means), "\n")
+cat("Column SDs   (should all be 1):", range(col_sds),   "\n")
+```
+
+---
+
+## Applying the PCA pipeline
+
+We now apply `compute_pca()` directly — the same function used on iris in vignette 03.
+
+```{r run-pca}
+# k = 40 rather than ncol(neural_scaled) = 47
+# deflation becomes numerically unstable in the last few near-zero
+# components — 40 captures 95% of variance (38 components needed)
+# so nothing meaningful is lost
+pca_result <- compute_pca(neural_scaled, k = 40)
+
+# summary table for first 10 components
+var_df <- data.frame(
+  PC         = paste0("PC", 1:10),
+  Eigenvalue = round(pca_result$eigenvalues[1:10], 4),
+  Var_Exp    = round(pca_result$var_explained[1:10] * 100, 2),
+  Cumulative = round(pca_result$cum_var_explained[1:10] * 100, 2)
+)
+
+knitr::kable(var_df,
+             col.names = c("Component", "Eigenvalue",
+                           "Variance Explained (%)", "Cumulative (%)"),
+             caption = "Variance explained by the first 10 principal components")
+```
+
+```{r key-numbers}
+k_80 <- which(pca_result$cum_var_explained >= 0.80)[1]
+k_95 <- which(pca_result$cum_var_explained >= 0.95)[1]
+
+cat(sprintf(
+  "PC1 explains:              %.1f%% of variance\n
+PC1 + PC2 combined:        %.1f%%\n
+Components for 80%% variance: %d of %d\n
+Components for 95%% variance: %d of %d\n",
+  pca_result$var_explained[1] * 100,
+  pca_result$cum_var_explained[2] * 100,
+  k_80, ncol(neural_scaled),
+  k_95, ncol(neural_scaled)
+))
+```
+
+---
+
+## Results
+
+### Scree plot
+
+```{r scree-plot, fig.width=7, fig.height=4}
+n_show   <- 20
+scree_df <- data.frame(
+  PC         = 1:n_show,
+  Variance   = pca_result$var_explained[1:n_show] * 100,
+  Cumulative = pca_result$cum_var_explained[1:n_show] * 100
+)
+
+ggplot(scree_df, aes(x = PC)) +
+  geom_col(aes(y = Variance), fill = "#7F77DD", alpha = 0.85, width = 0.6) +
+  geom_line(aes(y = Cumulative), colour = "#1D9E75", linewidth = 1) +
+  geom_point(aes(y = Cumulative), colour = "#1D9E75", size = 2.5) +
+  geom_hline(yintercept = 80, linetype = "dashed",
+             colour = "#BA7517", alpha = 0.8) +
+  geom_hline(yintercept = 95, linetype = "dashed",
+             colour = "#D85A30", alpha = 0.8) +
+  annotate("text", x = 17, y = 81.5, label = "80%",
+           size = 3, colour = "#BA7517") +
+  annotate("text", x = 17, y = 96.5, label = "95%",
+           size = 3, colour = "#D85A30") +
+  scale_x_continuous(breaks = seq(2, n_show, by = 2)) +
+  labs(
+    title    = "Scree Plot: Allen Brain Observatory Neuron Population",
+    subtitle = "316 neurons × 47 functional properties",
+    x        = "Principal Component",
+    y        = "Variance Explained (%)"
+  ) +
+  theme_minimal(base_size = 12)
+
+ggsave("figures/neural_pca_scree.png", width = 7, height = 4, dpi = 150)
+```
+
+PC1 explains **6.7%** of variance. The first two components together explain **13.0%**. Reaching 80% requires **25 components**; reaching 95% requires
+**38 of 47**. The scree plot shows no sharp elbow — variance decreases gradually and smoothly across components, with no single dimension dominating.
+
+This contrasts sharply with the iris result in vignette 03, where two components explained 97.77% of variance. That concentration arose because the
+four iris measurements are all correlated proxies for the same underlying quantity — flower size. 
+
+The Allen Brain functional properties are largely independent by design: orientation selectivity, receptive field size, running modulation, and response reliability measure genuinely different aspects of neural function. The result is a high-dimensional dataset where no small number of components captures most of the variance.
+
+This is not a failure of PCA. It is a finding: **visual cortex neuron functional properties are high-dimensional**. The population does not organise
+along one or two dominant axes of variation — it spans a broad, approximately uniform functional space.
+
+### PC1 vs PC2 score plot
+
+```{r score-plot, fig.width=7, fig.height=5}
+scores_df <- data.frame(
+  PC1 = pca_result$scores[, 1],
+  PC2 = pca_result$scores[, 2],
+  PC3 = pca_result$scores[, 3]
+)
+
+pc1_var <- round(pca_result$var_explained[1] * 100, 1)
+pc2_var <- round(pca_result$var_explained[2] * 100, 1)
+
+ggplot(scores_df, aes(x = PC1, y = PC2, colour = PC3)) +
+  geom_point(size = 2, alpha = 0.75) +
+  scale_colour_gradient2(low  = "#7F77DD", mid = "grey85",
+                         high = "#1D9E75", midpoint = 0) +
+  labs(
+    title    = "Neural Population PCA — PC1 vs PC2",
+    subtitle = "Each point = one neuron; colour = PC3 score",
+    x        = paste0("PC1 (", pc1_var, "% variance)"),
+    y        = paste0("PC2 (", pc2_var, "% variance)"),
+    colour   = "PC3"
+  ) +
+  theme_minimal(base_size = 12)
+
+ggsave("figures/neural_pca_scores.png", width = 7, height = 5, dpi = 150)
+```
+
+Because no single small set of components dominates this dataset, we don't see any neat, highly separated clusters of neurons in the PC1–PC2 plane. Instead, the cells form a continuous smear across the space. This implies that, at least based on these 47 metrics, the visual cortex doesn't contain a few rigid, discrete "classes" of cells, but rather a fluid continuum of functional types.
+
+### Loadings: What Drives each Principal Component?
+
+```{r loadings-plot, fig.width=9, fig.height=5}
+# select the variables with the largest absolute loadings on PC1 and PC2
+n_top <- 12
+feat_names <- colnames(neural_scaled)
+
+pc1_load <- pca_result$loadings[, 1]
+pc2_load <- pca_result$loadings[, 2]
+
+# top features by absolute loading on either PC1 or PC2
+top_idx <- order(abs(pc1_load) + abs(pc2_load), decreasing = TRUE)[1:n_top]
+
+loadings_df <- data.frame(
+  Feature = rep(feat_names[top_idx], 2),
+  Loading = c(pc1_load[top_idx], pc2_load[top_idx]),
+  PC      = rep(c("PC1", "PC2"), each = n_top)
+)
+loadings_df$Feature <- factor(loadings_df$Feature,
+                               levels = feat_names[top_idx])
+
+ggplot(loadings_df, aes(x = Feature, y = Loading, fill = PC)) +
+  geom_col(position = "dodge", alpha = 0.85, width = 0.65) +
+  scale_fill_manual(values = c("#7F77DD", "#1D9E75")) +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  labs(
+    title    = "PCA Loadings: Top 12 Features Driving PC1 and PC2",
+    subtitle = "Allen Brain Observatory — 316 visual cortex neurons",
+    x        = NULL,
+    y        = "Loading"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1))
+
+ggsave("figures/neural_pca_loadings.png", width = 9, height = 5, dpi = 150)
+```
+
+### Interpreting the loadings
+
+The loadings reveal what biological variation each principal component captures.
+
+- **PC1 (Direction Selectivity & Laminar Position)** is dominated by `dsi_dg` (loading = 0.857, which measures how strongly a neuron prefers one
+direction of motion over the opposite. A neuron with `dsi_dg` near 1 fires strongly for rightward motion but barely at all for leftward; a neuron near 0
+responds similarly to both. Secondary loadings on `imaging_depth` (0.361) and `pref_dir_dg` (0.358) indicate that this axis co-varies with cortical depth and preferred direction. This is consistent with known laminar organisation in mouse visual cortex, where direction-selective neurons are distributed non-uniformly across cortical layers. PC1 therefore captures a coordinated axis of variation:
+neurons that are strongly direction-selective tend to occur at particular cortical depths and to have coherent preferred directions.
+
+- **PC2(Eccentricity & Reliability)** loads on receptive field geometry and response reliability. The strongest drivers are `rf_distance_lsn` (0.468) — the distance of a neuron's receptive field from the centre of the visual field — and `rf_overlap_index_lsn` (−0.353), which measures the spatial overlap between ON and OFF receptive field subregions. Secondary loadings on `reliability_nm1_b` (0.379) and `reliability_nm2` (0.307) — trial-to-trial response consistency to natural movie stimuli — suggest that
+neurons with peripheral receptive fields tend to have more reliable natural scene responses. PC2 therefore captures a **receptive field eccentricity and
+reliability** axis: where in visual space a neuron's receptive field sits, and how consistently it responds to complex stimuli.
+
+Because PCA forces these components to be mathematically orthogonal, we have discovered that a neuron's direction selectivity (PC1) and its receptive field eccentricity (PC2) operate completely independently of one another within this population.
+
+---
+
+## The Same Mathematics, a Different Domain
+
+The pipeline used in this vignette is identical to that in vignette 03:
+
+```{r pipeline-comparison, eval=FALSE}
+# Iris (vignette 03)
+pca_iris   <- compute_pca(as.matrix(iris[, 1:4]), k = 4)
+
+# Allen Brain (this vignette)
+pca_neural <- compute_pca(neural_scaled, k = 40)
+
+# Same function. Same algorithm. Same mathematical operations.
+# Different data. Different interpretation.
+```
+
+To move from analyzing the physical morphology of garden flowers to unpacking the functional firing patterns of mouse cortical neurons, we didn't have to alter a single line of our code. Our `compute_pca()` function dutifully centered the data, built the covariance matrix, utilized our power iteration loops to find the eigenvectors, and projected the data down.
+
+This is the ultimate promise of this project: linear algebra is not just a grab-bag of domain-specific tricks. It is a universal language designed to map out structural reality. The exact same eigendecomposition that isolates the size of a flower petal also isolates the direction selectivity of a brain cell, simply because both datasets are matrices, and matrices have eigenvectors.
+
+---
+
+## Summary
+
+In this final vignette, we applied our PCA pipeline to a 316-neuron dataset from the Allen Brain Observatory to demonstrate how linear algebra reveals the inherent geometric structure of any data. We discovered that the functional organisation of the mouse visual cortex is remarkably high-dimensional, requiring 25 components to capture 80% of the dataset's structural energy. By decoding the mathematical loadings, we identified that the population's two largest independent axes of variation govern direction selectivity (which co-varies with cortical depth) and receptive field eccentricity (which is tied to firing reliability). Ultimately, the contrast between the highly compressible iris dataset and this diffuse neural population proves that our identical mathematical operations do not force a specific low-dimensional answer, but simply uncover the true dimensionality of the reality they are given.

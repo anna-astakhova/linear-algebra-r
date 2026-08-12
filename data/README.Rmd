@@ -1,0 +1,16 @@
+---
+title: "README"
+output: html_document
+---
+
+# Data sources
+
+## cell_metrics.csv
+Functional characterisation of 316 neurons recorded from mouse visual
+cortex using two-photon calcium imaging.
+
+Source: Allen Brain Observatory — Visual Coding dataset.
+Allen Institute for Brain Science (2016).
+Available at: portal.brain-map.org
+Accessed: 08/2026
+Licence: Allen Institute Terms of Use

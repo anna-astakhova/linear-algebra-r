@@ -74,7 +74,7 @@ compute_pca <- function(X, k = ncol(X)) {
   )
 }
 
-#' Compare our PCA to R's prcomp() — the ground truth check
+#' Compare our PCA to R's prcomp()
 #'
 #' @param X Raw data matrix
 #' @param k Number of components

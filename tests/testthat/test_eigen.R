@@ -1,5 +1,5 @@
 #' Tests for eigen.R
-#' Run with: source("R/matrix_ops.R"); source("R/eigen.R"); testthat::test_file("tests/testthat/test_eigen.R")
+#' Run with: devtools::test()
 
 # --- power_iteration ---------------------------
 

@@ -20,9 +20,9 @@ source("../R/svd_compress.R")
 
 ## The Geometric Why: Moving Beyond Square Matrices
 
-n our previous vignette, we built PCA by relying on a fundamental prerequisite: our data matrix $X$ X had to be transformed into a square covariance matrix $C = X^\top X$ before we could eigendecompose it. While this approach works perfectly well conceptually, it begs a structural question: is there a more direct mathematical path that lets us decompose the raw, rectangular matrix $X$ itself, without forming $C$ first?
+In our previous vignette, we built PCA by relying on a fundamental prerequisite: our data matrix $X$ X had to be transformed into a square covariance matrix $C = X^\top X$ before we could eigendecompose it. While this approach works perfectly well conceptually, it begs a structural question: is there a more direct mathematical path that lets us decompose the raw, rectangular matrix $X$ itself, without forming $C$ first?
 
-The answer is **Singular Value Decomposition (SVD)**. You can think of SVD as the ultimate generalization of eigendecomposition. It works on rectangular matrices of any conceivable shape. It is arguably the most general matrix factorization in all of linear algebra. SVD is the hidden engine powering image compression, natural language processing, recommender systems, and PCA itself.
+The answer is **Singular Value Decomposition (SVD)**. You can think of SVD as the ultimate generalisation of eigendecomposition. It works on rectangular matrices of any conceivable shape. It is arguably the most general matrix factorisation in all of linear algebra. SVD is the hidden engine powering image compression, natural language processing, and PCA itself.
 
 By unpacking SVD, we will discover that our eigenvalue approach from Vignette 03 and the SVD approach are just two different paths up the same mathematical mountain.
 
@@ -79,7 +79,7 @@ This works because $A \mathbf{v}_i = \sigma_i \mathbf{u}_i$ by the definition of
 ## Implementation
 
 ```{r compute-svd-demo}
-# Demonstrate SVD on a small matrix
+# SVD on a small matrix
 A <- matrix(c(3, 2, 1, 2, 4, 1), nrow = 3)
 
 my_svd  <- compute_svd(A)
@@ -145,4 +145,4 @@ The outputs are mathematically identical.
 
 We just explored how Singular Value Decomposition (SVD) offers a direct, mathematically robust way to compress raw data without ever calculating a covariance matrix. We proved computationally that SVD and PCA are functionally the exact same operation.
 
-In the next vignette, we will take this exact same mathematical pipeline and point it at neural population data. The underlying algebra remains completely unchanged; only our human interpretation of the geometry will shift.
+In the next vignette, we will take this exact same mathematical pipeline and point it at neural population data. The underlying algebra remains completely unchanged; only our interpretation of the geometry will shift.

@@ -127,7 +127,7 @@ inv_2x2 <- function(A) {
   if(!all(dim(A) == c(2,2))) stop ('Matrix must be 2x2')
   d <- det_2x2(A)
   if(abs(d) < 1e-10) stop ('Matrix is singular (det ≈ 0): no inverse exists')
-  (1/d) * matrix(c(A[2,2], -A[1,2], -A[2,1], A[1,1]), nrow = 2)
+  (1/d) * matrix(c(A[2,2], -A[1,2], -A[2,1], A[1,1]), nrow = 2, byrow = TRUE)
 }
 
 #' Check that A_inv is the true inverse of A

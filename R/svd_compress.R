@@ -32,33 +32,3 @@ compute_svd <- function(A) {
 
   list(U = U, Sigma = sigma, V = V)
 }
-
-#' Compute the rank-k SVD approximation of a matrix
-#'
-#' Uses the truncated SVD: A_k = sum_{i=1}^{k} sigma_i * u_i * v_i^T
-#' By the Eckart-Young theorem, this is the closest rank-k matrix to A
-#' in Frobenius norm — the best possible low-rank approximation.
-#'
-#' @param A Numeric matrix to approximate
-#' @param k Integer: rank of the approximation
-#' @return List with:
-#'   - approx: the rank-k approximation matrix (same dimensions as A)
-#'   - energy_captured: proportion of total energy (sum sigma^2) retained
-svd_approx <- function(A, k) {
-  s    <- compute_svd(A)
-  U    <- s$U
-  Sig  <- s$Sigma
-  V    <- s$V
-
-  # reconstruct using only top k singular triplets
-  # sum of outer products: sigma_i * u_i * v_i^T
-  approx <- matrix(0, nrow = nrow(A), ncol = ncol(A))
-  for (i in 1:k) {
-    approx <- approx + Sig[i] * (U[, i] %*% t(V[, i]))
-  }
-
-  # energy captured = proportion of sum of squared singular values
-  energy <- sum(Sig[1:k]^2) / sum(Sig^2)
-
-  list(approx = approx, energy_captured = energy)
-}
